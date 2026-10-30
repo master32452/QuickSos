@@ -1,0 +1,1116 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>QuickSOS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: ficha de producto. Un visor 3D manipulable como pieza central y, debajo, módulos que se tocan:
+   carrera de tiempos, simulador de alerta con PIN y pestañas del proyecto. */
+:root{
+  --bg:#F2F1F6; --surface:#FFFFFF; --surface-2:#E8E6F0; --ink:#17151F; --muted:#5C586E; --line:#D8D5E3;
+  --sos:#D3283B; --sos-soft:#FBE3E6; --on-sos:#FFFFFF;
+  --ble:#5244D4; --ble-soft:#E6E3FB; --ok:#14845A; --ok-soft:#DDF3E9; --warn:#A85F00; --warn-soft:#FBEBD3;
+  --stage-a:#E9E6F4; --stage-b:#CBC6E0; --stage-ink:#2B2840;
+  --c1:#5244D4; --c2:#8C80EA; --c3:#D3283B; --c4:#E88A95; --c5:#9A96AB;
+  --f-display:"Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:14px; --r-sm:9px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111018; --surface:#1A1824; --surface-2:#242131; --ink:#EEEDF6; --muted:#A39FB7; --line:#322E41;
+    --sos:#FF5466; --sos-soft:#3A1820; --on-sos:#16080B;
+    --ble:#958BFF; --ble-soft:#25213F; --ok:#43C690; --ok-soft:#14291F; --warn:#F2A642; --warn-soft:#2E2210;
+    --stage-a:#2C2940; --stage-b:#14131C; --stage-ink:#DCD8EE;
+    --c1:#958BFF; --c2:#5E54B8; --c3:#FF5466; --c4:#A83845; --c5:#6E6A82;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111018; --surface:#1A1824; --surface-2:#242131; --ink:#EEEDF6; --muted:#A39FB7; --line:#322E41;
+  --sos:#FF5466; --sos-soft:#3A1820; --on-sos:#16080B;
+  --ble:#958BFF; --ble-soft:#25213F; --ok:#43C690; --ok-soft:#14291F; --warn:#F2A642; --warn-soft:#2E2210;
+  --stage-a:#2C2940; --stage-b:#14131C; --stage-ink:#DCD8EE;
+  --c1:#958BFF; --c2:#5E54B8; --c3:#FF5466; --c4:#A83845; --c5:#6E6A82;
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:72px}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important; animation:none!important} }
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:16px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+  -webkit-font-smoothing:antialiased;
+}
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top, 0px); z-index:10; background:var(--bg)}
+.wrap{max-width:1160px; margin:0 auto}
+h1,h2,h3{font-family:var(--f-display); font-stretch:118%; text-wrap:balance; margin:0; line-height:1.04; letter-spacing:-0.01em}
+h1{font-size:clamp(2.3rem, 5.4vw, 4.1rem); font-weight:850}
+h2{font-size:clamp(1.7rem, 3.6vw, 2.6rem); font-weight:800}
+h3{font-size:1.12rem; font-weight:750; font-stretch:108%; letter-spacing:0}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono); font-size:.74rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+.lede{font-size:1.12rem; color:var(--muted); max-width:52ch}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+button{font:inherit; color:inherit; cursor:pointer}
+:focus-visible{outline:3px solid var(--ble); outline-offset:2px; border-radius:6px}
+
+/* ---------- header ---------- */
+.top{position:sticky; top:env(safe-area-inset-top, 0px); z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid var(--line); margin:0 calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)))}
+.top-in{max-width:1160px; margin:0 auto; display:flex; align-items:center; gap:18px; padding-block:12px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.brand{display:flex; align-items:center; gap:9px; font-family:var(--f-display); font-weight:850; font-stretch:120%; font-size:1.15rem; text-decoration:none; color:var(--ink); flex:none}
+.brand svg{width:26px; height:26px}
+.nav{display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; margin-left:auto; min-width:0}
+.nav::-webkit-scrollbar{display:none}
+.nav a{white-space:nowrap; text-decoration:none; color:var(--muted); font-size:.92rem; padding:6px 11px; border-radius:99px}
+.nav a:hover{color:var(--ink); background:var(--surface-2)}
+
+section{padding-block:72px 8px}
+.sec-head{display:grid; gap:12px; margin-bottom:28px; max-width:720px}
+
+/* ---------- hero ---------- */
+.hero{display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:40px; align-items:start; padding-block:44px 0}
+.hero-copy{display:grid; gap:22px; padding-top:28px}
+.hero h1 em{font-style:normal; color:var(--sos)}
+.keys{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.key{padding:14px 12px 14px 0; display:grid; gap:2px}
+.key + .key{padding-left:14px; border-left:1px solid var(--line)}
+.key b{font-family:var(--f-mono); font-size:1.55rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.key span{font-size:.86rem; color:var(--muted); line-height:1.3}
+.hero-actions{display:flex; flex-wrap:wrap; gap:10px}
+.btn{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--surface); padding:10px 16px; border-radius:99px; font-weight:700; font-size:.95rem; text-decoration:none; color:var(--ink)}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--sos); border-color:var(--sos); color:var(--on-sos)}
+.btn.primary:hover{filter:brightness(1.06)}
+
+/* ---------- 3D viewer ---------- */
+.viewer{display:grid; gap:12px}
+.stage{position:relative; aspect-ratio:5/4.3; max-width:100%; border-radius:22px; overflow:hidden; background:radial-gradient(120% 90% at 50% 30%, var(--stage-a), var(--stage-b)); border:1px solid var(--line)}
+.stage canvas{display:block; width:100%; height:100%; touch-action:pan-y; cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.stage .hint{position:absolute; left:14px; bottom:12px; font-family:var(--f-mono); font-size:.72rem; color:var(--stage-ink); opacity:.75; pointer-events:none}
+.stage .nogl{position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px; color:var(--stage-ink)}
+.tools{position:absolute; top:12px; right:12px; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; max-width:calc(100% - 24px)}
+.tool{border:1px solid color-mix(in srgb, var(--stage-ink) 22%, transparent); background:color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter:blur(6px); padding:7px 12px; border-radius:99px; font-size:.84rem; font-weight:700}
+.tool[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.labels{position:absolute; inset:0; pointer-events:none}
+.pin{position:absolute; transform:translate(-50%,-50%); pointer-events:auto; display:flex; align-items:center; gap:6px; border:0; background:none; padding:0}
+.pin i{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-style:normal; font-family:var(--f-mono); font-size:.72rem; font-weight:600; background:var(--surface); color:var(--ink); box-shadow:0 0 0 2px var(--ink); transition:transform .15s}
+.pin span{font-size:.74rem; font-weight:700; background:var(--surface); color:var(--ink); padding:2px 7px; border-radius:6px; white-space:nowrap; opacity:0; transform:translateX(-4px); transition:.15s; pointer-events:none}
+.pin:hover span, .pin.on span{opacity:1; transform:none}
+.pin.on i{background:var(--sos); color:var(--on-sos); box-shadow:0 0 0 2px var(--sos); transform:scale(1.15)}
+.pin[hidden]{display:none}
+
+.parts{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.2fr); gap:12px}
+.chips{display:flex; flex-wrap:wrap; gap:6px; align-content:start}
+.chip{border:1px solid var(--line); background:var(--surface); padding:6px 11px; border-radius:99px; font-size:.86rem; display:inline-flex; gap:7px; align-items:center}
+.chip i{font-style:normal; font-family:var(--f-mono); font-size:.72rem; color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--sos); background:var(--sos-soft)}
+.chip[aria-pressed="true"] i{color:var(--sos)}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px; display:grid; gap:6px; align-content:start; min-width:0}
+.card .eyebrow{color:var(--sos)}
+.card .spec{font-family:var(--f-mono); font-size:.8rem; color:var(--muted); padding-top:6px; border-top:1px dashed var(--line); margin-top:4px}
+
+/* ---------- problema ---------- */
+.stats{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; margin-bottom:22px}
+.stat{padding:20px; border-radius:var(--r); background:var(--surface); border:1px solid var(--line); display:grid; gap:6px; align-content:start}
+.stat b{font-family:var(--f-display); font-stretch:110%; font-size:2.5rem; font-weight:850; line-height:1}
+.stat p{color:var(--muted); font-size:.95rem}
+.stat small{font-family:var(--f-mono); font-size:.7rem; color:var(--muted); letter-spacing:.04em}
+.race{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:22px; display:grid; gap:18px}
+.race-head{display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center}
+.clock{font-family:var(--f-mono); font-size:1.6rem; font-weight:600; font-variant-numeric:tabular-nums}
+.track{display:grid; gap:8px}
+.track-top{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:.92rem}
+.track-top b{font-weight:700}
+.track-top span{font-family:var(--f-mono); font-size:.82rem; color:var(--muted)}
+.bar{position:relative; height:34px; background:var(--surface-2); border-radius:8px; overflow:hidden}
+.bar .fill{position:absolute; inset:0 auto 0 0; width:0; border-radius:8px}
+.bar.slow .fill{background:var(--c5)}
+.bar.fast .fill{background:var(--sos); min-width:0}
+.bar .attack{position:absolute; top:0; bottom:0; left:calc(5 / 60 * 100%); width:2px; background:var(--ink); z-index:2}
+.bar .done{position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:.8rem; font-weight:700; color:var(--ink); z-index:3; white-space:nowrap; opacity:0; transition:opacity .2s}
+.bar.fast .done{left:calc(1.2 / 60 * 100% + 8px)}
+.steps-slow{display:flex; flex-wrap:wrap; gap:6px}
+.steps-slow span{font-size:.8rem; padding:3px 9px; border-radius:99px; background:var(--surface-2); color:var(--muted); transition:.2s}
+.steps-slow span.on{background:var(--ink); color:var(--bg)}
+.axis{position:relative; height:18px; font-family:var(--f-mono); font-size:.7rem; color:var(--muted)}
+.axis span{position:absolute; transform:translateX(-50%)}
+.axis span:first-child{transform:none}
+.axis span:last-child{transform:translateX(-100%)}
+.attack-note{font-size:.86rem; color:var(--muted); display:flex; gap:8px; align-items:center}
+.attack-note::before{content:""; width:2px; height:16px; background:var(--ink); flex:none}
+
+/* ---------- simulador ---------- */
+.sim{display:grid; grid-template-columns:minmax(0, 1.05fr) minmax(0, .8fr) minmax(0, 1fr); gap:18px; align-items:start}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:20px; display:grid; gap:16px; min-width:0}
+.seg{display:grid; grid-template-columns:1fr 1fr; background:var(--surface-2); border-radius:12px; padding:4px; gap:4px}
+.seg button{border:0; background:none; padding:9px 8px; border-radius:9px; font-weight:700; font-size:.9rem; line-height:1.2}
+.seg button small{display:block; font-weight:400; font-size:.75rem; color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface); box-shadow:0 1px 3px rgb(0 0 0 / .12)}
+.toggle{display:flex; align-items:center; justify-content:space-between; gap:10px; font-weight:700; font-size:.92rem}
+.switch{width:46px; height:26px; border-radius:99px; border:0; background:var(--c5); position:relative; flex:none}
+.switch::after{content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.18s}
+.switch[aria-checked="true"]{background:var(--ok)}
+.switch[aria-checked="true"]::after{left:23px}
+.press-zone{display:grid; justify-items:center; gap:10px; padding-top:4px}
+.press{position:relative; width:118px; height:118px; border-radius:50%; border:0; background:radial-gradient(circle at 35% 30%, #4a4757, #1d1b25 70%); box-shadow:0 8px 0 #0c0b10, 0 12px 26px rgb(0 0 0 / .25); color:#fff; font-family:var(--f-display); font-weight:850; font-stretch:120%; font-size:1.05rem; letter-spacing:.04em; transition:transform .08s, box-shadow .08s; touch-action:none; user-select:none; -webkit-user-select:none}
+.press.down{transform:translateY(6px); box-shadow:0 2px 0 #0c0b10, 0 4px 10px rgb(0 0 0 / .25)}
+.press svg{position:absolute; inset:-9px; width:136px; height:136px; transform:rotate(-90deg); pointer-events:none}
+.press svg circle{fill:none; stroke-width:5}
+.press svg .bg{stroke:var(--line)}
+.press svg .fg{stroke:var(--sos); stroke-linecap:round; stroke-dasharray:408; stroke-dashoffset:408}
+.press-msg{font-size:.86rem; color:var(--muted); text-align:center; min-height:2.6em; max-width:30ch}
+
+.phone{justify-self:center; width:100%; max-width:250px; aspect-ratio:9/18.5; border-radius:34px; background:#0E0D13; padding:10px; box-shadow:0 18px 40px rgb(0 0 0 / .22)}
+.screen{height:100%; border-radius:26px; background:var(--surface); overflow:hidden; display:flex; flex-direction:column; transition:background .3s; position:relative}
+.screen .bar-s{display:flex; justify-content:space-between; padding:9px 16px 4px; font-family:var(--f-mono); font-size:.66rem; color:var(--muted)}
+.scr{flex:1; display:flex; flex-direction:column; padding:8px 14px 14px; gap:10px; min-height:0}
+.scr[hidden]{display:none}
+.app-t{font-family:var(--f-display); font-weight:850; font-stretch:120%; font-size:1.05rem}
+.conn{display:inline-flex; gap:6px; align-items:center; font-size:.72rem; font-weight:700; color:var(--ok); background:var(--ok-soft); padding:4px 9px; border-radius:99px; align-self:flex-start}
+.conn::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--ok)}
+.slider{margin-top:auto; height:58px; border-radius:99px; background:var(--surface-2); position:relative; display:flex; align-items:center; justify-content:space-between; padding:0 16px; font-size:.72rem; font-weight:700; touch-action:none; user-select:none; -webkit-user-select:none}
+.slider .sl-l{color:var(--warn)} .slider .sl-r{color:var(--sos)}
+.knob{position:absolute; left:50%; top:50%; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%; border:0; background:var(--ink); display:grid; place-items:center; box-shadow:0 4px 12px rgb(0 0 0 / .25); cursor:grab; touch-action:none}
+.knob svg{width:20px; height:20px}
+.knob.back{transition:transform .25s}
+.slide-t{font-family:var(--f-display); font-weight:800; font-stretch:105%; font-size:.86rem; text-align:center}
+.modes{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.mode{border:1px solid var(--line); border-radius:12px; padding:10px 12px; display:grid; gap:2px; transition:.2s}
+.mode b{font-family:var(--f-mono); font-size:.95rem}
+.mode span{font-size:.8rem; color:var(--muted); line-height:1.3}
+.mode.on{border-color:var(--sos); background:var(--sos-soft)}
+.taps{display:flex; gap:6px; justify-content:center; height:10px}
+.taps i{width:10px; height:10px; border-radius:50%; background:var(--line); transition:.15s}
+.taps i.on{background:var(--sos)}
+.idle-note{font-size:.76rem; color:var(--muted)}
+.screen.alert{background:var(--sos)}
+.screen.alert .bar-s{color:var(--on-sos); opacity:.8}
+.al-t{color:var(--on-sos); font-family:var(--f-display); font-weight:850; font-stretch:115%; font-size:1.02rem; line-height:1.1}
+.al-s{color:var(--on-sos); font-size:.72rem; opacity:.9}
+.bubble{background:var(--surface); border-radius:12px; padding:9px 10px; font-size:.7rem; line-height:1.35; color:var(--ink); word-break:break-word}
+.bubble b{display:block; font-size:.62rem; color:var(--muted); font-family:var(--f-mono); font-weight:400; margin-bottom:2px}
+.call{background:color-mix(in srgb, var(--on-sos) 16%, transparent); color:var(--on-sos); border-radius:12px; padding:7px 10px; font-size:.74rem; font-weight:700; display:flex; justify-content:space-between}
+.pinpad{margin-top:auto; display:grid; gap:6px}
+.pin-dots{display:flex; justify-content:center; gap:8px; height:12px}
+.pin-dots span{width:10px; height:10px; border-radius:50%; border:2px solid var(--on-sos)}
+.pin-dots span.f{background:var(--on-sos)}
+.pin-dots.bad{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.keys-p{display:grid; grid-template-columns:repeat(3,1fr); gap:5px}
+.keys-p button{border:0; border-radius:9px; padding:6px 0; background:color-mix(in srgb, var(--on-sos) 14%, transparent); color:var(--on-sos); font-family:var(--f-mono); font-weight:600; font-size:.86rem}
+.pin-hint{font-size:.64rem; text-align:center; color:var(--on-sos); opacity:.85}
+
+.flow{list-style:none; margin:0; padding:0; display:grid; gap:2px; counter-reset:f}
+.flow li{display:grid; grid-template-columns:28px minmax(0,1fr); gap:10px; padding:9px 4px; border-radius:10px; transition:background .25s, opacity .25s; opacity:.55}
+.flow li::before{counter-increment:f; content:counter(f); width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-family:var(--f-mono); font-size:.78rem; border:1.5px solid var(--line); background:var(--surface)}
+.flow li b{display:block; font-size:.93rem}
+.flow li span{font-size:.82rem; color:var(--muted)}
+.flow li.act{opacity:1; background:var(--warn-soft)}
+.flow li.act::before{border-color:var(--warn); color:var(--warn)}
+.flow li.ok{opacity:1}
+.flow li.ok::before{content:"✓"; background:var(--ok); border-color:var(--ok); color:#fff}
+.flow li.skip{opacity:.3}
+.flow li.skip b{text-decoration:line-through}
+
+.howto{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-top:22px; counter-reset:h}
+.howto div{border-top:2px solid var(--ink); padding-top:12px; display:grid; gap:4px}
+.howto div::before{counter-increment:h; content:"Paso " counter(h); font-family:var(--f-mono); font-size:.72rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase}
+.howto p{font-size:.92rem; color:var(--muted)}
+
+/* ---------- app ---------- */
+.feat{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px}
+.feat .card h3{font-size:1.02rem}
+.feat .card p{color:var(--muted); font-size:.92rem}
+.feat .ico{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:var(--ble-soft); color:var(--ble); margin-bottom:4px}
+.feat .ico svg{width:18px; height:18px}
+.arch{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:18px; margin-top:18px}
+.layers{display:grid; gap:6px}
+.layer{border:1px solid var(--line); background:var(--surface); border-radius:var(--r-sm); padding:11px 14px; text-align:left; display:flex; justify-content:space-between; gap:10px; align-items:center; font-weight:700; font-size:.92rem}
+.layer span{font-family:var(--f-mono); font-weight:400; font-size:.72rem; color:var(--muted)}
+.layer[aria-pressed="true"]{border-color:var(--ble); background:var(--ble-soft)}
+.layer[aria-pressed="true"] span{color:var(--ble)}
+.layer-detail{display:grid; gap:12px; align-content:start}
+.tags{display:flex; flex-wrap:wrap; gap:6px}
+.tags span{font-family:var(--f-mono); font-size:.78rem; padding:4px 9px; border-radius:7px; background:var(--surface-2)}
+
+/* ---------- proyecto ---------- */
+.tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; margin-bottom:22px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0; background:none; padding:10px 14px; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-1px; white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink); border-color:var(--sos)}
+.team{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px}
+.person{display:grid; gap:10px; align-content:start}
+.avatar{width:48px; height:48px; border-radius:14px; display:grid; place-items:center; font-family:var(--f-display); font-weight:850; font-stretch:115%; background:var(--ink); color:var(--bg)}
+.person p{color:var(--muted); font-size:.9rem}
+.meta-row{display:flex; flex-wrap:wrap; gap:10px 24px; margin-top:18px; font-size:.92rem; color:var(--muted)}
+.meta-row b{color:var(--ink)}
+.tl-wrap{overflow-x:auto; padding-bottom:8px}
+.tl{display:grid; grid-template-columns:repeat(10, minmax(96px, 1fr)); min-width:960px; position:relative}
+.tl::before{content:""; position:absolute; left:0; right:0; top:9px; height:2px; background:var(--line)}
+.ms{position:relative; display:grid; gap:6px; padding-right:10px; border:0; background:none; text-align:left}
+.ms i{width:20px; height:20px; border-radius:50%; background:var(--surface); border:2px solid var(--ink); position:relative; z-index:1}
+.ms b{font-family:var(--f-mono); font-size:.74rem; color:var(--muted); font-weight:400}
+.ms span{font-size:.88rem; font-weight:700; line-height:1.25}
+.ms.last i{background:var(--sos); border-color:var(--sos)}
+.ms.mid i{background:var(--ble); border-color:var(--ble)}
+.budget{display:grid; gap:16px}
+.stack{display:flex; height:44px; border-radius:10px; overflow:hidden; gap:2px}
+.stack button{border:0; height:100%; padding:0; transition:filter .15s, opacity .15s}
+.stack button:hover, .stack button.on{filter:brightness(1.12)}
+.stack.dim button:not(.on){opacity:.45}
+.legend{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:8px}
+.lg{display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:10px; align-items:center; border:1px solid var(--line); background:var(--surface); border-radius:var(--r-sm); padding:10px 12px; text-align:left}
+.lg i{width:12px; height:12px; border-radius:3px}
+.lg span{font-size:.9rem; font-weight:700}
+.lg b{font-family:var(--f-mono); font-size:.86rem; font-weight:600; font-variant-numeric:tabular-nums}
+.lg.on{border-color:var(--ink)}
+.bud-detail{font-size:.92rem; color:var(--muted); min-height:1.5em}
+.bud-detail b{color:var(--ink)}
+.risks{display:grid; gap:10px}
+.risk{display:grid; grid-template-columns:minmax(0, 1.3fr) 150px minmax(0, 1.4fr); gap:18px; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 18px}
+.risk h3{font-size:.98rem}
+.prob{display:grid; gap:5px}
+.prob .mono{font-size:.8rem}
+.prob .pb{height:8px; background:var(--surface-2); border-radius:99px; overflow:hidden}
+.prob .pb i{display:block; height:100%; background:var(--warn); border-radius:99px}
+.lvl{font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:99px; margin-left:6px; vertical-align:middle; font-family:var(--f-mono)}
+.lvl.alto{background:var(--sos-soft); color:var(--sos)}
+.lvl.medio{background:var(--warn-soft); color:var(--warn)}
+.risk p{font-size:.9rem; color:var(--muted)}
+
+footer{margin-top:72px; border-top:1px solid var(--line); padding-block:26px 40px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:14px; font-size:.86rem; color:var(--muted)}
+footer b{color:var(--ink)}
+
+/* ---------- responsive ---------- */
+@media (max-width: 980px){
+  .hero{grid-template-columns:minmax(0,1fr); gap:24px}
+  .hero-copy{padding-top:0}
+  .sim{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .sim .flow-panel{grid-column:1 / -1}
+  .feat, .team{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .howto{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .risk{grid-template-columns:minmax(0,1fr) 140px}
+  .risk p{grid-column:1 / -1}
+}
+@media (max-width: 640px){
+  section{padding-block:52px 4px}
+  .parts, .arch{grid-template-columns:minmax(0,1fr)}
+  .stats{grid-template-columns:minmax(0,1fr)}
+  .sim{grid-template-columns:minmax(0,1fr)}
+  .feat, .team, .howto{grid-template-columns:minmax(0,1fr)}
+  .risk{grid-template-columns:minmax(0,1fr)}
+  .stage{aspect-ratio:1/1.05}
+  .key b{font-size:1.25rem}
+  .nav a{padding:6px 8px; font-size:.86rem}
+  .brand span{display:none}
+}
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#brazalete" aria-label="QuickSOS, inicio">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="24" width="20" height="4" rx="1.5" fill="var(--ink)"/><path d="M9 24v-7a7 7 0 0 1 14 0v7z" fill="var(--sos)"/><rect x="12.4" y="16" width="2.2" height="5" rx="1.1" fill="var(--surface)"/><g stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round"><path d="M16 3v3.2M6.5 7.5l2.2 2.2M25.5 7.5l-2.2 2.2M2.5 16h3M26.5 16h3"/></g></svg>
+      <span>QuickSOS</span>
+    </a>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#brazalete">Brazalete</a>
+      <a href="#problema">Problema</a>
+      <a href="#alerta">Alerta</a>
+      <a href="#app">App</a>
+      <a href="#proyecto">Proyecto</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ================= HERO + VISOR ================= -->
+<section id="brazalete" class="hero" aria-labelledby="t-hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Brazalete IoT + app móvil · UT Tecámac</p>
+    <h1 id="t-hero">Pide ayuda <em>sin sacar</em> el teléfono.</h1>
+    <p class="lede">QuickSOS es un brazalete con botones. Lo presionas sin mirar, incluso con la mano en el bolsillo, y la app avisa a tus contactos con tu ubicación.</p>
+    <div class="keys">
+      <div class="key"><b>≤ 1.2 s</b><span>de la pulsación a la alerta</span></div>
+      <div class="key"><b>1</b><span>botón, se usa sin mirar</span></div>
+      <div class="key"><b>2</b><span>acciones: aviso o 911</span></div>
+    </div>
+    <div class="hero-actions">
+      <a class="btn primary" href="#alerta">Probar el simulador</a>
+      <button class="btn" type="button" id="goInside">Ver por dentro</button>
+    </div>
+  </div>
+
+  <div class="viewer" id="visor">
+    <div class="stage" id="stage">
+      <div class="labels" id="labels"></div>
+      <div class="tools" role="toolbar" aria-label="Controles del modelo 3D">
+        <button class="tool" type="button" id="tSpin" aria-pressed="true">Girar</button>
+        <button class="tool" type="button" id="tOpen" aria-pressed="false">Abrir caja</button>
+        <button class="tool" type="button" id="tXray" aria-pressed="false">Rayos X</button>
+        <button class="tool" type="button" id="tReset">Centrar</button>
+      </div>
+      <p class="hint" id="hint">Arrastra para girar · toca una pieza</p>
+    </div>
+    <div class="parts">
+      <div class="chips" id="chips" aria-label="Piezas del brazalete"></div>
+      <div class="card" id="partCard" aria-live="polite">
+        <p class="eyebrow" id="pcT">Pieza</p>
+        <h3 id="pcN">Toca una pieza</h3>
+        <p id="pcD">Elige una pieza en el modelo o en la lista para ver qué hace.</p>
+        <p class="spec" id="pcS">Modelo basado en la caja impresa del prototipo</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROBLEMA ================= -->
+<section id="problema" aria-labelledby="t-prob">
+  <div class="sec-head">
+    <p class="eyebrow">El problema</p>
+    <h2 id="t-prob">En una agresión, el teléfono llega tarde.</h2>
+    <p class="lede">Con miedo, las manos tiemblan y cuesta pensar. Sacar el celular, desbloquearlo y abrir una app toma demasiado, y además delata a la víctima ante el agresor.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>85–92 %</b><p>de las mujeres en Ecatepec y Naucalpan se sienten inseguras.</p><small>ENSU · INEGI</small></div>
+    <div class="stat"><b>70.1 %</b><p>de las mujeres mexiquenses ha vivido algún tipo de violencia.</p><small>ENDIREH · INEGI</small></div>
+    <div class="stat"><b>&lt; 5 s</b><p>tarda en consolidarse una agresión en la vía pública.</p><small>Análisis del proyecto</small></div>
+  </div>
+
+  <div class="race" id="race">
+    <div class="race-head">
+      <div>
+        <h3>¿Cuánto tarda pedir ayuda?</h3>
+        <p style="color:var(--muted); font-size:.92rem">Corre las dos formas al mismo tiempo (10× más rápido).</p>
+      </div>
+      <div style="display:flex; gap:14px; align-items:center">
+        <span class="clock" id="clock">0.0 s</span>
+        <button class="btn primary" type="button" id="raceBtn">Simular</button>
+      </div>
+    </div>
+    <div class="track">
+      <div class="track-top"><b>App de pánico tradicional</b><span>30–60 s</span></div>
+      <div class="bar slow"><div class="fill" id="fSlow"></div><div class="attack"></div></div>
+      <div class="steps-slow" id="slowSteps"><span>Sacar el teléfono</span><span>Desbloquear</span><span>Buscar la app</span><span>Abrir y presionar</span></div>
+    </div>
+    <div class="track">
+      <div class="track-top"><b>Brazalete QuickSOS</b><span>≤ 1.2 s</span></div>
+      <div class="bar fast"><div class="fill" id="fFast"></div><div class="attack"></div><span class="done" id="fastDone">Alerta enviada</span></div>
+    </div>
+    <div class="axis" aria-hidden="true"><span style="left:0">0 s</span><span style="left:8.33%">5</span><span style="left:25%">15</span><span style="left:50%">30</span><span style="left:75%">45</span><span style="left:100%">60 s</span></div>
+    <p class="attack-note">La línea marca los 5 s en que se consolida una agresión.</p>
+  </div>
+</section>
+
+<!-- ================= ALERTA ================= -->
+<section id="alerta" aria-labelledby="t-al">
+  <div class="sec-head">
+    <p class="eyebrow">Cómo funciona</p>
+    <h2 id="t-al">Así se activa una alerta</h2>
+    <p class="lede">Toca el botón del brazalete una vez para avisar a tus contactos o dos veces seguidas para llamar al 911. En la app también puedes deslizar: izquierda avisa, derecha llama.</p>
+  </div>
+
+  <div class="sim">
+    <div class="panel">
+      <div>
+        <p class="eyebrow" style="margin-bottom:8px">Botón del brazalete</p>
+        <div class="modes">
+          <div class="mode" id="mAviso"><b>1 toque</b><span>Mensaje con tu ubicación</span></div>
+          <div class="mode" id="mCall"><b>2 toques</b><span>Llamada al 911</span></div>
+        </div>
+      </div>
+      <div class="toggle"><span id="dataLbl">Datos móviles</span><button class="switch" type="button" role="switch" id="dataSw" aria-checked="true" aria-labelledby="dataLbl"></button></div>
+      <div class="press-zone">
+        <button class="press" type="button" id="press" aria-describedby="pressMsg">SOS</button>
+        <div class="taps" aria-hidden="true"><i></i><i></i></div>
+        <p class="press-msg" id="pressMsg">Toca una vez para avisar o dos veces seguidas para llamar.</p>
+      </div>
+    </div>
+
+    <div class="phone" aria-label="Pantalla de la app (simulada)">
+      <div class="screen" id="screen">
+        <div class="bar-s"><span>9:41</span><span id="netLbl">4G ●●●</span></div>
+        <div class="scr" id="scrIdle">
+          <p class="app-t">QuickSOS</p>
+          <span class="conn">Brazalete conectado</span>
+          <p class="idle-note">Tus contactos están listos para recibir el aviso.</p>
+          <p class="slide-t" style="margin-top:auto">Desliza el botón para actuar</p>
+          <p class="idle-note" style="text-align:center">Izquierda avisa · Derecha llama al 911</p>
+          <div class="slider" id="slider"><span class="sl-l">Aviso</span><span class="sl-r">Llamada</span>
+            <button class="knob" type="button" id="knob" aria-label="Botón deslizable: flecha izquierda para avisar, flecha derecha para llamar"><svg viewBox="0 0 24 24" fill="var(--bg)"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"/></svg></button>
+          </div>
+        </div>
+        <div class="scr" id="scrAlert" hidden>
+          <div>
+            <p class="al-t" id="alT">ALERTA</p>
+            <p class="al-s" id="alS">Enviando…</p>
+          </div>
+          <div class="bubble" id="bubble"><b id="bubT">Mensaje a tus contactos</b><span id="bubM">Obteniendo ubicación…</span></div>
+          <div class="call" id="call911" hidden><span>Llamar al 911</span><span>›</span></div>
+          <div class="pinpad">
+            <div class="pin-dots" id="dots"><span></span><span></span><span></span><span></span></div>
+            <div class="keys-p" id="keypad"></div>
+            <p class="pin-hint">Cancela con tu PIN · ejemplo: 1234</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel flow-panel">
+      <p class="eyebrow">Lo que pasa en la app</p>
+      <ol class="flow" id="flow"></ol>
+    </div>
+  </div>
+
+  <div class="howto">
+    <div><h3>Crea tu cuenta</h3><p>Instala la app, verifica correo y teléfono y da permisos de ubicación y Bluetooth.</p></div>
+    <div><h3>Agrega contactos</h3><p>Elige a las personas que pueden responder rápido.</p></div>
+    <div><h3>Empareja el brazalete</h3><p>Con Bluetooth activo, la pantalla de inicio debe decir “conectado”.</p></div>
+    <div><h3>Pruébalo cada semana</h3><p>Así confirmas que sigue conectado y con batería.</p></div>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<section id="app" aria-labelledby="t-app">
+  <div class="sec-head">
+    <p class="eyebrow">La aplicación</p>
+    <h2 id="t-app">Pensada para el peor momento</h2>
+  </div>
+  <div class="feat">
+    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg></div><h3>Cero distracciones</h3><p>Una pantalla de inicio sin menús ni anuncios: solo el botón para pedir ayuda.</p></div>
+    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h3>PIN de seguridad</h3><p>Con la alerta activa se bloquean la pantalla y los contactos. Solo tu PIN la cancela.</p></div>
+    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></div><h3>Respaldo por SMS</h3><p>Sin datos móviles, la alerta sale por SMS con el enlace de tu ubicación.</p></div>
+    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/></svg></div><h3>Tus datos son tuyos</h3><p>Cada usuaria solo puede leer su propia información. La ubicación solo se usa para la alerta.</p></div>
+  </div>
+
+  <div class="arch">
+    <div class="layers" id="layers" role="group" aria-label="Capas de la arquitectura"></div>
+    <div class="card layer-detail" aria-live="polite">
+      <p class="eyebrow" style="color:var(--ble)" id="ldT">Capa</p>
+      <h3 id="ldN"></h3>
+      <p id="ldD" style="color:var(--muted)"></p>
+      <div class="tags" id="ldTags"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROYECTO ================= -->
+<section id="proyecto" aria-labelledby="t-pr">
+  <div class="sec-head">
+    <p class="eyebrow">El proyecto</p>
+    <h2 id="t-pr">Equipo, tiempos y números</h2>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Datos del proyecto">
+    <button class="tab" role="tab" id="tab-eq" aria-controls="p-eq" aria-selected="true">Equipo</button>
+    <button class="tab" role="tab" id="tab-cr" aria-controls="p-cr" aria-selected="false" tabindex="-1">Cronograma</button>
+    <button class="tab" role="tab" id="tab-pre" aria-controls="p-pre" aria-selected="false" tabindex="-1">Presupuesto</button>
+    <button class="tab" role="tab" id="tab-ri" aria-controls="p-ri" aria-selected="false" tabindex="-1">Riesgos</button>
+  </div>
+
+  <div role="tabpanel" id="p-eq" aria-labelledby="tab-eq">
+    <div class="team">
+      <div class="card person"><div class="avatar">SC</div><h3>Sofía Trinidad Cruz Ávila</h3><p>Product Owner. Prioriza el trabajo, cuida la experiencia de uso y trata con el sponsor.</p></div>
+      <div class="card person"><div class="avatar">ÁR</div><h3>Ángel Gabriel Rodríguez Adame</h3><p>Desarrollo core. Firmware del brazalete, geolocalización e integración.</p></div>
+      <div class="card person"><div class="avatar">FL</div><h3>Francisco Eduardo López Estrada</h3><p>Desarrollo core. Flujo de trabajo, configuración e integración de la app.</p></div>
+      <div class="card person"><div class="avatar">LR</div><h3>Liam Romo Dorantes</h3><p>Ingeniero de calidad. Pruebas de campo y validación con ISO/IEC 25010.</p></div>
+    </div>
+    <div class="meta-row">
+      <span>Metodología: <b>Scrumban</b></span>
+      <span>Límite de trabajo: <b class="mono">3</b> tareas en desarrollo y <b class="mono">2</b> en pruebas</span>
+      <span>Zona piloto: <b>Tecámac y Ecatepec</b></span>
+    </div>
+  </div>
+
+  <div role="tabpanel" id="p-cr" aria-labelledby="tab-cr" hidden>
+    <div class="tl-wrap" tabindex="0" aria-label="Línea de tiempo de hitos (desliza)">
+      <div class="tl" id="timeline"></div>
+    </div>
+    <p class="meta-row">Ciclo escolar mayo–agosto 2026. Los hitos en morado son las dos acciones: aviso y llamada.</p>
+  </div>
+
+  <div role="tabpanel" id="p-pre" aria-labelledby="tab-pre" hidden>
+    <div class="budget">
+      <div style="display:flex; flex-wrap:wrap; gap:8px 28px; align-items:baseline">
+        <span class="clock" id="budTotal">$6,885 MXN</span>
+        <span style="color:var(--muted); font-size:.92rem">Suma de las partidas · lote piloto de 5 brazaletes · precio meta ≤ $500 MXN por brazalete</span>
+      </div>
+      <div class="stack" id="stack" role="group" aria-label="Distribución del presupuesto"></div>
+      <div class="legend" id="legend"></div>
+      <p class="bud-detail" id="budDetail">Toca una partida para ver qué incluye.</p>
+    </div>
+  </div>
+
+  <div role="tabpanel" id="p-ri" aria-labelledby="tab-ri" hidden>
+    <div class="risks" id="risks"></div>
+  </div>
+</section>
+
+<footer>
+  <span><b>QuickSOS</b> · Universidad Tecnológica de Tecámac · Administración de Proyectos de TI</span>
+  <span>Prof. Omar Téllez Barrientos · Grupo 10IDS1 · Mayo–agosto 2026</span>
+</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (s, r=document) => r.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* =====================================================================
+   PIEZAS
+   ===================================================================== */
+const PARTS = [
+  {id:"xiao",  n:"XIAO ESP32‑C3", t:"Microcontrolador", d:"El cerebro del brazalete. Lee los botones y manda la señal a la app por Bluetooth Low Energy.", s:"21 × 17.8 mm · BLE · RISC‑V a 160 MHz", inside:true},
+  {id:"bat",   n:"Batería LiPo 3.7 V", t:"Energía", d:"Batería recargable. Se carga por el USB‑C de la placa y va soldada a los pads BAT del reverso.", s:"≈ 30 × 12 × 5 mm", inside:true},
+  {id:"b1",    n:"Botón SOS", t:"Activación", d:"Un toque manda un mensaje con tu ubicación a tus contactos. Dos toques seguidos llaman al 911.", s:"Botón táctil de 6 × 6 mm"},
+  {id:"usb",   n:"Puerto USB‑C", t:"Carga", d:"Permite cargar la batería y programar la placa sin abrir la caja.", s:"Hueco en el costado"},
+  {id:"case",  n:"Caja impresa en 3D", t:"Carcasa", d:"Base y tapa que cierran a presión. Diseñada para resistir salpicaduras.", s:"35.5 × 46.3 mm · base 15.8 mm + tapa 3.6 mm"},
+  {id:"strap", n:"Correa", t:"Sujeción", d:"Se desliza en las ranuras de los extremos, como la de un smartwatch. Se ve como un accesorio común.", s:"Correa de silicón intercambiable"}
+];
+const chips = $("#chips");
+PARTS.forEach((p,i)=>{
+  const b = document.createElement("button");
+  b.type="button"; b.className="chip"; b.dataset.id=p.id; b.setAttribute("aria-pressed","false");
+  b.innerHTML = `<i>${i+1}</i>${p.n}`;
+  b.addEventListener("click", ()=>select(p.id, true));
+  chips.appendChild(b);
+});
+let selected = null;
+let viewerApi = null;
+function select(id, fromUI){
+  selected = (selected===id && fromUI==="toggle") ? null : id;
+  const p = PARTS.find(x=>x.id===selected);
+  chips.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed", String(c.dataset.id===selected)));
+  if(p){ $("#pcT").textContent=p.t; $("#pcN").textContent=p.n; $("#pcD").textContent=p.d; $("#pcS").textContent=p.s; }
+  else { $("#pcT").textContent="Pieza"; $("#pcN").textContent="Toca una pieza"; $("#pcD").textContent="Elige una pieza en el modelo o en la lista para ver qué hace."; $("#pcS").textContent="Modelo basado en la caja impresa del prototipo"; }
+  if(viewerApi) viewerApi.highlight(selected, p && p.inside);
+}
+
+/* =====================================================================
+   VISOR 3D (Three.js, unidades en mm)
+   ===================================================================== */
+function initViewer(){
+  const stage = $("#stage");
+  let renderer;
+  try{
+    if(!window.THREE) throw new Error("no three");
+    renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  }catch(e){
+    const d=document.createElement("div"); d.className="nogl";
+    d.innerHTML="<p>Tu navegador no pudo mostrar el modelo 3D.<br>La lista de piezas de abajo sigue funcionando.</p>";
+    stage.appendChild(d); $("#hint").hidden=true; return null;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.insertBefore(renderer.domElement, stage.firstChild);
+  renderer.domElement.setAttribute("aria-label","Modelo 3D del brazalete QuickSOS. Arrastra para girarlo.");
+  renderer.domElement.setAttribute("role","img");
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6a6488, 0.85));
+  const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(60, 120, 90); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xb9b0ff, 0.9); rim.position.set(-90, 50, -110); scene.add(rim);
+  const fill = new THREE.DirectionalLight(0xffe2e6, 0.35); fill.position.set(80, -30, -40); scene.add(fill);
+
+  // ---------- materiales ----------
+  const mk = o=>{ const m=new THREE.MeshStandardMaterial(o); m.color.convertSRGBToLinear(); return m; };
+  const M = {
+    pla:    ()=>mk({color:0x26252c, roughness:.86, metalness:.04}),
+    strap:  ()=>mk({color:0x1d1c22, roughness:.62, metalness:.0}),
+    pcb:    ()=>mk({color:0x121216, roughness:.55, metalness:.15}),
+    metal:  ()=>mk({color:0xc9cbd2, roughness:.32, metalness:.85}),
+    gold:   ()=>mk({color:0xd9a441, roughness:.35, metalness:.9}),
+    plastic:()=>mk({color:0x111114, roughness:.7}),
+    pouch:  ()=>mk({color:0xb9bcc4, roughness:.42, metalness:.7}),
+    kapton: ()=>mk({color:0xd99a18, roughness:.4, metalness:.2}),
+    red:    ()=>mk({color:0xd32f2f, roughness:.5}),
+    black:  ()=>mk({color:0x202024, roughness:.5}),
+    dark:   ()=>mk({color:0x08080a, roughness:.9}),
+    white:  ()=>mk({color:0xf2f2f2, roughness:.6}),
+    wireG:  ()=>mk({color:0x2e9d5b, roughness:.5}),
+    wireO:  ()=>mk({color:0xe07b1a, roughness:.5})
+  };
+
+  function rrPath(P, w, h, r){
+    const x=-w/2, y=-h/2;
+    P.moveTo(x+r, y); P.lineTo(x+w-r, y); P.absarc(x+w-r, y+r, r, -Math.PI/2, 0, false);
+    P.lineTo(x+w, y+h-r); P.absarc(x+w-r, y+h-r, r, 0, Math.PI/2, false);
+    P.lineTo(x+r, y+h); P.absarc(x+r, y+h-r, r, Math.PI/2, Math.PI, false);
+    P.lineTo(x, y+r); P.absarc(x+r, y+r, r, Math.PI, Math.PI*1.5, false);
+    return P;
+  }
+  // forma en XZ, extruida hacia +Y
+  function slab(w, l, r, h, holeW, holeL, holeR, bevel){
+    const s = rrPath(new THREE.Shape(), w, l, r);
+    if(holeW) s.holes.push(rrPath(new THREE.Path(), holeW, holeL, holeR));
+    const g = new THREE.ExtrudeGeometry(s, {depth:h, bevelEnabled:!!bevel, bevelThickness:bevel||0, bevelSize:bevel||0, bevelSegments:3, curveSegments:24});
+    g.rotateX(-Math.PI/2);
+    return g;
+  }
+  const box = (x,y,z,m)=>new THREE.Mesh(new THREE.BoxGeometry(x,y,z), m);
+  function tube(points, r, m){
+    const c = new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+    return new THREE.Mesh(new THREE.TubeGeometry(c, 40, r, 8, false), m);
+  }
+
+  const watch = new THREE.Group(); scene.add(watch);
+  const groups = {}; const meshesByPart = {};
+  function part(id){
+    const g = new THREE.Group(); g.userData.part=id; groups[id]=g; meshesByPart[id]=[]; watch.add(g); return g;
+  }
+  function add(id, mesh){ mesh.userData.part=id; groups[id].add(mesh); meshesByPart[id].push(mesh); return mesh; }
+
+  // ---------- medidas (del STL de la base con pines) ----------
+  const OX=35.5, OL=46.3, IX=31.5, IZ=32.3, FLOOR=1.6, H=15.8, LID=1.6;
+  const xiaoZ=-7.0;              // centro de la XIAO en Z
+  const boardY=FLOOR+9;          // parte baja de la placa (sobre los pines)
+
+  // ---------- caja ----------
+  const gCase = part("case");
+  const caseMats = [];
+  const walls = add("case", new THREE.Mesh(slab(OX, OL, 4, H, IX, IZ, 2, .35), M.pla())); caseMats.push(walls.material);
+  const floor = add("case", new THREE.Mesh(slab(OX, OL, 4, FLOOR), M.pla())); caseMats.push(floor.material);
+  // ranuras de la correa (abertura en cada extremo)
+  [-1,1].forEach(s=>{ const sl=add("case", box(OX+.2, 3, .6, M.dark())); sl.position.set(0, H/2, s*(OL/2+.3)); caseMats.push(sl.material); });
+  // separador interior
+  const sep = add("case", box(22, 4, 1, M.pla())); sep.position.set(-1.5, FLOOR+2, -16.15+18.3+.5); caseMats.push(sep.material);
+  // tapa
+  const gLid = new THREE.Group(); watch.add(gLid);
+  const lid = new THREE.Mesh(slab(OX, OL, 4, LID, 0,0,0, .35), M.pla()); lid.userData.part="case"; lid.position.y=H; gLid.add(lid); caseMats.push(lid.material); meshesByPart.case.push(lid);
+
+  // ---------- USB-C (hueco en la pared izquierda) ----------
+  part("usb");
+  const usbZ=xiaoZ, usbY=boardY+1+1.6;
+  const hole = add("usb", new THREE.Mesh(slab(5.2, 10.2, 2.5, .5), M.dark()));
+  hole.geometry.rotateZ(Math.PI/2); hole.position.set(-OX/2+.1, usbY, usbZ);
+
+  // ---------- XIAO ESP32-C3 ----------
+  const gX = part("xiao");
+  const xCx = -15.75+10.5;  // centro X de la placa
+  const pcb = add("xiao", box(21, 1, 17.8, M.pcb())); pcb.position.set(xCx, boardY+.5, xiaoZ);
+  const shield = add("xiao", box(12.6, 2.3, 13.2, M.metal())); shield.position.set(xCx+2.6, boardY+1+1.15, xiaoZ);
+  const label = add("xiao", box(11.4, .05, 12, M.white())); label.position.set(xCx+2.6, boardY+3.33, xiaoZ);
+  const usbc = add("xiao", box(7.4, 3.2, 8.9, M.metal())); usbc.position.set(-15.75+3.2, boardY+1+1.6, xiaoZ);
+  const ufl = add("xiao", new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,1.2,20), M.gold())); ufl.position.set(xCx+9, boardY+1.6, xiaoZ);
+  [-1,1].forEach(s=>{ const t=add("xiao", box(2.6,.9,3.4,M.metal())); t.position.set(xCx+9, boardY+1.45, xiaoZ+s*5.2); });
+  // pines y regletas
+  for(const s of [-1,1]){
+    const rowZ = xiaoZ + s*(17.8/2-1.3);
+    const header = add("xiao", box(17.78, 2.5, 2.54, M.plastic())); header.position.set(xCx+.6, boardY-1.25, rowZ);
+    for(let i=0;i<7;i++){
+      const px = xCx+.6 - 7.62 + i*2.54;
+      const pin = add("xiao", box(.64, 9.2, .64, M.gold())); pin.position.set(px, boardY-4.6+.3, rowZ);
+      const pad = add("xiao", box(1.4,.06,1.8, M.gold())); pad.position.set(px, boardY+1.03, rowZ+s*.25);
+    }
+  }
+
+  // ---------- batería ----------
+  const gB = part("bat");
+  const batZ = -16.15+18.3+1+.9+6;
+  const pouch = add("bat", new THREE.Mesh(slab(27.3, 10.8, 1.2, 3.8, 0,0,0, .6), M.pouch()));
+  pouch.position.set(0.5, FLOOR+.6, batZ);
+  const kap = add("bat", box(2.2, 5.6, 12.4, M.kapton())); kap.position.set(-14.4, FLOOR+3.1, batZ);
+
+  // ---------- botones ----------
+  const btnY = FLOOR+3.1;
+  [["b1", xiaoZ]].forEach(([id, z])=>{
+    part(id);
+    const body = add(id, box(3.5, 6, 6, M.black())); body.position.set(OX/2-2-1.75-.4, btnY, z);
+    [-1,1].forEach(a=>[-1,1].forEach(b=>{ const leg=add(id, box(1.2,.4,.4, M.metal())); leg.position.set(OX/2-2-3.5-.9, btnY+a*2.2, z+b*2.2); }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.75,1.75,4.6,24), M.plastic());
+    cap.geometry.rotateZ(Math.PI/2); cap.position.set(OX/2-.2, btnY, z); add(id, cap);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.05,.28,10,28), M.dark());
+    ring.rotation.y=Math.PI/2; ring.position.set(OX/2+.3, btnY, z); add(id, ring);
+  });
+
+  // ---------- cables (solo con la caja cerrada) ----------
+  const gW = new THREE.Group(); watch.add(gW);
+  gW.add(tube([[-12.5, FLOOR+3, batZ-6.2],[-11,FLOOR+5,batZ-9],[-9, boardY-1, -6]], .45, M.red()));
+  gW.add(tube([[-12.5, FLOOR+2, batZ-6.2],[-9,FLOOR+4,batZ-9.5],[-7, boardY-1, -6.5]], .45, M.black()));
+  gW.add(tube([[OX/2-6, btnY+2, xiaoZ],[3, boardY-3, xiaoZ-9],[-7.3, boardY-6, xiaoZ-7.4]], .38, M.wireG()));
+
+  // ---------- correa ----------
+  part("strap");
+  (function(){
+    const R=33, cy=-28, pts=[[23.6,7.5],[27,5],[30.5,-1]];
+    for(let a=20; a>=-200; a-=20){ const r=a*Math.PI/180; pts.push([R*Math.cos(r), cy+R*Math.sin(r)]); }
+    pts.push([-30.5,-1],[-27,5],[-23.6,7.5]);
+    const curve = new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(0,p[1],p[0])), false, "catmullrom", .5);
+    const N=140, w=22, t=2.6, ring=[];
+    for(let i=0;i<=N;i++){
+      const u=i/N, p=curve.getPointAt(u), tg=curve.getTangentAt(u);
+      const n=new THREE.Vector3(0, tg.z, -tg.y).normalize();
+      ring.push([[-w/2,-1],[w/2,-1],[w/2,1],[-w/2,1]].map(([x,k])=>new THREE.Vector3(x, p.y+n.y*k*t/2, p.z+n.z*k*t/2)));
+    }
+    const pos=[], idx=[]; let base=0;
+    for(let side=0; side<4; side++){
+      const a=side, b=(side+1)%4;
+      for(let i=0;i<=N;i++){ const A=ring[i][a], B=ring[i][b]; pos.push(A.x,A.y,A.z,B.x,B.y,B.z); }
+      for(let i=0;i<N;i++){ const o=base+i*2; idx.push(o,o+2,o+1, o+1,o+2,o+3); }
+      base += (N+1)*2;
+    }
+    const g=new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
+    const m=M.strap(); m.side=THREE.DoubleSide;
+    add("strap", new THREE.Mesh(g, m));
+    // hebilla
+    const bk = new THREE.Mesh(slab(27, 9, 2.5, 1.2, 22.6, 5.4, 1.2), M.metal());
+    bk.position.set(0, cy-R-2.9, 0); add("strap", bk);
+  })();
+
+  // centrar el conjunto
+  watch.position.y = 8;
+
+  // ---------- anclas de etiquetas ----------
+  const anchors = {
+    xiao:[xCx+2.6, boardY+3.4, xiaoZ], bat:[0, FLOOR+5.6, batZ], b1:[OX/2+2.4, btnY, xiaoZ],
+    usb:[-OX/2-.5, usbY, usbZ], case:[0, H+LID+.4, 0], strap:[0, -28-33, 0]
+  };
+  const anchorObj = {};
+  Object.entries(anchors).forEach(([id,p])=>{
+    const o=new THREE.Object3D(); o.position.set(...p);
+    (id==="case" ? gLid : groups[id]).add(o); anchorObj[id]=o;
+  });
+  const labelsEl = $("#labels"); const pinEls={};
+  PARTS.forEach((p,i)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="pin"; b.dataset.id=p.id;
+    b.innerHTML=`<i>${i+1}</i><span>${p.n}</span>`; b.setAttribute("aria-label", p.n);
+    b.addEventListener("click", e=>{ e.stopPropagation(); select(p.id, true); });
+    labelsEl.appendChild(b); pinEls[p.id]=b;
+  });
+
+  // ---------- estado: abrir caja / rayos X ----------
+  const OFF = { lid:[0,27,0], xiao:[0,13,0], bat:[0,17,0], b1:[9,0,0] };
+  let openT=0, openTarget=0, xray=false, xrayT=0;
+  function applyOpen(t){
+    const e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+    Object.entries(OFF).forEach(([id,v])=>{ const g=id==="lid"?gLid:groups[id]; g.position.set(v[0]*e, v[1]*e, v[2]*e); });
+    gLid.rotation.x = -0.35*e; gLid.position.z = -10*e;
+    gW.visible = t<.04;
+  }
+  function applyXray(t){
+    caseMats.forEach(m=>{ m.transparent = t>0.001; m.opacity = 1-0.82*t; m.depthWrite = t<0.5; });
+    groups.strap.children.forEach(c=>{ if(!c.material) return; c.material.transparent=t>0.001; c.material.opacity=1-.55*t; c.material.depthWrite = t<.5; });
+  }
+
+  // ---------- resaltar ----------
+  const accent = new THREE.Color();
+  function highlight(id, inside){
+    accent.set(css("--sos") || "#d3283b");
+    Object.entries(meshesByPart).forEach(([pid, list])=>{
+      list.forEach(m=>{ if(!m.material.emissive) return; m.material.emissive.copy(pid===id ? accent : new THREE.Color(0)); m.material.emissiveIntensity = pid===id ? .45 : 0; });
+    });
+    Object.values(pinEls).forEach(el=>el.classList.toggle("on", el.dataset.id===id));
+    if(inside && openTarget===0 && !xray){ setOpen(true); }
+    if(id){ focusOn(id); }
+  }
+
+  // ---------- cámara orbital simple ----------
+  const target = new THREE.Vector3(0, -6, 0);
+  const view = { th: 0.75, ph: 0.42, r: 205 };
+  const goal = { th: 0.75, ph: 0.42, r: 205 };
+  let spin = !reduce, dragging=false, lastX=0, lastY=0, moved=0, idleAt=0;
+  const FOCUS = { xiao:[0.6,0.8,215], bat:[0.15,0.8,215], b1:[1.45,0.25,150], usb:[-1.55,0.25,150], case:[0.75,0.55,190], strap:[0.2,-0.05,215] };
+  function focusOn(id){ const f=FOCUS[id]; if(!f) return; let th=f[0]; while(th - view.th > Math.PI) th-=2*Math.PI; while(view.th - th > Math.PI) th+=2*Math.PI; goal.th=th; goal.ph=f[1]; goal.r=f[2]; setSpin(false); }
+  function placeCam(){
+    const cp=Math.cos(view.ph);
+    camera.position.set(target.x + view.r*cp*Math.sin(view.th), target.y + view.r*Math.sin(view.ph), target.z + view.r*cp*Math.cos(view.th));
+    camera.lookAt(target);
+  }
+  const cv = renderer.domElement;
+  cv.addEventListener("pointerdown", e=>{ dragging=true; moved=0; lastX=e.clientX; lastY=e.clientY; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; moved+=Math.abs(dx)+Math.abs(dy);
+    goal.th -= dx*0.009; goal.ph = Math.max(-0.6, Math.min(1.35, goal.ph + dy*0.007));
+    if(moved>4) setSpin(false);
+  });
+  const end = e=>{ if(!dragging) return; dragging=false; if(moved<5) pick(e); idleAt=performance.now(); };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", ()=>{dragging=false;});
+  cv.addEventListener("wheel", e=>{ e.preventDefault(); goal.r = Math.max(110, Math.min(320, goal.r + e.deltaY*0.18)); }, {passive:false});
+
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function pick(e){
+    const r=cv.getBoundingClientRect(); ndc.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+    ray.setFromCamera(ndc, camera);
+    const all=[]; Object.values(meshesByPart).forEach(l=>l.forEach(m=>{ if(m.visible) all.push(m); }));
+    const hits = ray.intersectObjects(all, false).filter(h=>!(xrayT>.5 && h.object.userData.part==="case"));
+    if(hits.length){ select(hits[0].object.userData.part, true); }
+  }
+
+  // ---------- botones de herramientas ----------
+  const tSpin=$("#tSpin"), tOpen=$("#tOpen"), tXray=$("#tXray");
+  function setSpin(v){ spin=v; tSpin.setAttribute("aria-pressed", String(v)); }
+  function setOpen(v){ openTarget=v?1:0; tOpen.setAttribute("aria-pressed", String(v)); tOpen.textContent = v ? "Cerrar caja" : "Abrir caja"; if(v){ goal.ph=Math.max(goal.ph,.62); goal.r=Math.max(goal.r,215);} }
+  function setXray(v){ xray=v; tXray.setAttribute("aria-pressed", String(v)); }
+  tSpin.addEventListener("click", ()=>setSpin(!spin));
+  tOpen.addEventListener("click", ()=>setOpen(openTarget===0));
+  tXray.addEventListener("click", ()=>setXray(!xray));
+  $("#tReset").addEventListener("click", ()=>{ goal.th=.75; goal.ph=.42; goal.r=205; setOpen(false); setXray(false); select(null); setSpin(!reduce); });
+
+  // ---------- tamaño ----------
+  function resize(){
+    const w=stage.clientWidth, h=stage.clientHeight; if(!w||!h) return;
+    renderer.setSize(w, h, false); camera.aspect=w/h;
+    camera.fov = w/h < .95 ? 36 : 30; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(stage); resize();
+
+  // ---------- bucle ----------
+  let visible=true;
+  new IntersectionObserver(es=>{ visible = es[0].isIntersecting; }, {threshold:0}).observe(stage);
+  const NRM = { usb:[-1,0,0], b1:[1,0,0], case:[0,1,0] };
+  const v=new THREE.Vector3(); let last=performance.now();
+  function frame(now){
+    requestAnimationFrame(frame);
+    const dt=Math.min(.05,(now-last)/1000); last=now;
+    if(!visible) return;
+    if(spin && !dragging) goal.th += dt*0.35;
+    const k = reduce ? 1 : 1-Math.pow(.0015, dt);
+    view.th += (goal.th-view.th)*k; view.ph += (goal.ph-view.ph)*k; view.r += (goal.r-view.r)*k;
+    const s = reduce ? 1 : dt*1.8;
+    openT += Math.sign(openTarget-openT)*Math.min(Math.abs(openTarget-openT), s); applyOpen(openT);
+    const xt = xray?1:0; xrayT += Math.sign(xt-xrayT)*Math.min(Math.abs(xt-xrayT), s*1.3); applyXray(xrayT);
+    target.y = -6 + 19*openT;
+    placeCam();
+    renderer.render(scene, camera);
+    // etiquetas
+    const w=stage.clientWidth, h=stage.clientHeight;
+    const insideVisible = openT>.6 || xrayT>.6;
+    PARTS.forEach(p=>{
+      const el=pinEls[p.id];
+      if(p.inside && !insideVisible){ el.hidden=true; return; }
+      anchorObj[p.id].getWorldPosition(v);
+      const nrm = NRM[p.id];
+      if(nrm && !insideVisible && (nrm[0]*(camera.position.x-v.x)+nrm[1]*(camera.position.y-v.y)+nrm[2]*(camera.position.z-v.z)) < 0){ el.hidden=true; return; }
+      v.project(camera);
+      if(v.z>1 || Math.abs(v.x)>1.05 || Math.abs(v.y)>1.05){ el.hidden=true; return; }
+      el.hidden=false; el.style.left=((v.x+1)/2*w)+"px"; el.style.top=((1-v.y)/2*h)+"px";
+    });
+  }
+  requestAnimationFrame(frame);
+
+  return { highlight, open:()=>{ setOpen(true); setXray(false); goal.th=.6; goal.ph=.75; goal.r=225; setSpin(false);} };
+}
+viewerApi = initViewer();
+$("#goInside").addEventListener("click", ()=>{
+  $("#visor").scrollIntoView({behavior: reduce?"auto":"smooth", block:"center"});
+  if(viewerApi) viewerApi.open(); select("xiao");
+});
+
+/* =====================================================================
+   CARRERA DE TIEMPOS
+   ===================================================================== */
+(function(){
+  const btn=$("#raceBtn"), clock=$("#clock"), fs=$("#fSlow"), ff=$("#fFast"), done=$("#fastDone"), steps=[...$("#slowSteps").children];
+  const END=45, SPEED=10; let raf=0;
+  function draw(t){
+    fs.style.width = (Math.min(t,END)/60*100)+"%";
+    ff.style.width = (Math.min(t,1.2)/60*100)+"%";
+    done.style.opacity = t>=1.2 ? 1 : 0;
+    clock.textContent = t.toFixed(1)+" s";
+    steps.forEach((s,i)=>s.classList.toggle("on", t >= i*END/4 && t>0));
+  }
+  btn.addEventListener("click", ()=>{
+    cancelAnimationFrame(raf);
+    if(reduce){ draw(END); return; }
+    const t0=performance.now(); btn.textContent="Repetir";
+    (function step(now){ const t=(now-t0)/1000*SPEED; draw(Math.min(t,END)); if(t<END) raf=requestAnimationFrame(step); })(t0);
+  });
+  draw(0);
+})();
+
+/* =====================================================================
+   SIMULADOR DE ALERTA
+   1 toque o deslizar a la izquierda = aviso · 2 toques o deslizar a la derecha = llamada
+   ===================================================================== */
+(function(){
+  let data=true, timers=[], pin="", taps=0, tapTimer=0;
+  const sw=$("#dataSw"), press=$("#press"), msg=$("#pressMsg"), tapDots=[...document.querySelectorAll(".taps i")];
+  const flow=$("#flow"), screen=$("#screen"), idle=$("#scrIdle"), alertS=$("#scrAlert"), mA=$("#mAviso"), mC=$("#mCall");
+  const COORD = "19.7130,-98.9680";
+  const DEFAULT_MSG = "Toca una vez para avisar o dos veces seguidas para llamar.";
+  function steps(mode){
+    return [
+      ["Señal recibida", "Del brazalete por BLE (≤ 1.2 s) o al deslizar en la app"],
+      ["Acción detectada", mode==="llamada" ? "Llamada al 911" : mode==="aviso" ? "Aviso a tus contactos" : "1 toque: aviso · 2 toques: llamada"],
+      ["Modo pánico", "Pantalla y contactos bloqueados"],
+      ["Ubicación GPS", "Enlace de mapa listo (límite de 12 s)"],
+      data ? ["Envío por la nube", "Con datos móviles, a tus contactos"] : ["Respaldo por SMS", "Sin datos: se abre la mensajería con el enlace"],
+      ["Llamada al 911", "Se abre el marcador listo para llamar"],
+      ["Solo tu PIN la cancela", "Nadie más puede apagar la alerta"]
+    ];
+  }
+  const SKIP = { aviso:[5], llamada:[3,4] };
+  function renderFlow(mode){
+    flow.innerHTML = steps(mode).map(s=>`<li><div><b>${s[0]}</b><span>${s[1]}</span></div></li>`).join("");
+    (SKIP[mode]||[]).forEach(k=>flow.children[k].classList.add("skip"));
+  }
+  function clear(){ timers.forEach(clearTimeout); timers=[]; }
+  function setTaps(n){ tapDots.forEach((d,i)=>d.classList.toggle("on", i<n)); }
+  function reset(){
+    clear(); clearTimeout(tapTimer); taps=0; setTaps(0); pin=""; dots();
+    screen.classList.remove("alert"); idle.hidden=false; alertS.hidden=true; renderFlow(null);
+    mA.classList.remove("on"); mC.classList.remove("on"); msg.textContent=DEFAULT_MSG; resetKnob();
+  }
+  sw.addEventListener("click", ()=>{ data=!data; sw.setAttribute("aria-checked", String(data)); $("#netLbl").textContent = data ? "4G ●●●" : "Sin datos ○○○"; reset(); });
+
+  function fire(mode, source){
+    reset(); renderFlow(mode);
+    (mode==="aviso" ? mA : mC).classList.add("on");
+    const li=[...flow.children];
+    const order = mode==="aviso" ? [0,1,2,3,4,6] : [0,1,2,5,6];
+    const at=(ms,fn)=>timers.push(setTimeout(fn, reduce?0:ms));
+    screen.classList.add("alert"); idle.hidden=true; alertS.hidden=false;
+    $("#alT").textContent = mode==="aviso" ? "AVISO A TUS CONTACTOS" : "LLAMADA AL 911";
+    $("#alS").textContent = source==="app" ? "Deslizaste en la app" : "Brazalete activado";
+    $("#call911").hidden = mode!=="llamada";
+    if(mode==="aviso"){ $("#bubT").textContent = data ? "Envío por la nube · tus contactos" : "SMS · tus contactos"; $("#bubM").textContent = "Obteniendo ubicación…"; }
+    else { $("#bubT").textContent = "Marcador del teléfono"; $("#bubM").textContent = "Se abre el marcador con el 911 listo. Tú confirmas la llamada."; }
+    let t=0;
+    order.forEach((idx,k)=>{
+      at(t, ()=>{ if(k>0){ li[order[k-1]].classList.remove("act"); li[order[k-1]].classList.add("ok"); } li[idx].classList.add("act");
+        if(idx===2) $("#alS").textContent="Pantalla bloqueada";
+        if(idx===4){ $("#bubM").textContent = `ALERTA QuickSOS. Necesito ayuda. Mi ubicación: https://maps.google.com/?q=${COORD}`; $("#alS").textContent = data ? "Avisando a tus contactos" : "Confirma el envío del SMS"; }
+        if(idx===5) $("#alS").textContent = "Confirma la llamada";
+      });
+      t += idx===3 ? 1100 : 450;
+    });
+    at(t, ()=>{ const lst=li[order[order.length-1]]; lst.classList.remove("act"); lst.classList.add("ok"); msg.textContent="Alerta activa. Escribe el PIN 1234 en el teléfono para cancelarla."; });
+  }
+
+  // toques del brazalete
+  press.addEventListener("pointerdown", ()=>press.classList.add("down"));
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=>press.addEventListener(ev, ()=>press.classList.remove("down")));
+  press.addEventListener("click", ()=>{
+    if(!alertS.hidden){ reset(); }
+    taps++; setTaps(taps); clearTimeout(tapTimer);
+    if(taps>=2){ taps=0; fire("llamada","brazalete"); setTaps(2); return; }
+    msg.textContent = "1 toque… toca otra vez para llamar al 911.";
+    tapTimer = setTimeout(()=>{ taps=0; fire("aviso","brazalete"); setTaps(1); }, 650);
+  });
+
+  // botón deslizable de la app
+  const slider=$("#slider"), knob=$("#knob"); let dragX=null, dx=0;
+  function maxD(){ return slider.clientWidth/2 - 30; }
+  function resetKnob(){ dx=0; knob.classList.add("back"); knob.style.transform="translateX(0)"; }
+  knob.addEventListener("pointerdown", e=>{ dragX=e.clientX; knob.classList.remove("back"); knob.setPointerCapture(e.pointerId); });
+  knob.addEventListener("pointermove", e=>{ if(dragX===null) return; dx=Math.max(-maxD(), Math.min(maxD(), e.clientX-dragX)); knob.style.transform=`translateX(${dx}px)`; });
+  const release=()=>{ if(dragX===null) return; dragX=null; const m=maxD();
+    if(dx<=-m*0.8) fire("aviso","app"); else if(dx>=m*0.8) fire("llamada","app"); else resetKnob(); };
+  knob.addEventListener("pointerup", release); knob.addEventListener("pointercancel", ()=>{ dragX=null; resetKnob(); });
+  knob.addEventListener("keydown", e=>{ if(e.key==="ArrowLeft"){ e.preventDefault(); fire("aviso","app"); } if(e.key==="ArrowRight"){ e.preventDefault(); fire("llamada","app"); } });
+
+  // PIN
+  const keypad=$("#keypad");
+  ["1","2","3","4","5","6","7","8","9","","0","⌫"].forEach(k=>{
+    const b=document.createElement("button"); b.type="button"; b.textContent=k;
+    if(!k){ b.style.visibility="hidden"; b.tabIndex=-1; }
+    b.setAttribute("aria-label", k==="⌫" ? "Borrar" : "Dígito "+k);
+    b.addEventListener("click", ()=>{
+      if(k==="⌫"){ pin=pin.slice(0,-1); dots(); return; }
+      if(pin.length>=4) return; pin+=k; dots();
+      if(pin.length===4){
+        if(pin==="1234"){ timers.push(setTimeout(()=>{ reset(); msg.textContent="Alerta cancelada con el PIN."; }, 250)); }
+        else { const d=$("#dots"); d.classList.remove("bad"); void d.offsetWidth; d.classList.add("bad"); timers.push(setTimeout(()=>{ pin=""; dots(); }, 400)); }
+      }
+    });
+    keypad.appendChild(b);
+  });
+  function dots(){ [...$("#dots").children].forEach((d,i)=>d.classList.toggle("f", i<pin.length)); }
+  reset();
+})();
+
+/* =====================================================================
+   ARQUITECTURA
+   ===================================================================== */
+(function(){
+  const L=[
+    ["Presentación","Pantallas","Inicio, contactos, perfil, ajustes y acceso. En Inicio, el botón deslizable avisa hacia la izquierda y llama hacia la derecha.",["Flutter","Dart","screens/","widgets/"]],
+    ["Estado","Provider","Almacenes por tema: perfil de la usuaria, contactos de emergencia y ajustes.",["UserProfileStore","EmergencyContactsStore","AppSettingsStore"]],
+    ["Servicios","Lógica","Autenticación, ubicación GPS con límite de 12 s, acciones de emergencia y validación de formularios.",["auth_service","location_service","emergency_actions","validators"]],
+    ["Datos","Firebase","Cuentas, perfil, contactos e historial de alertas. Cada usuaria solo ve lo suyo.",["Firebase Auth","Cloud Firestore","shared_preferences"]],
+    ["Brazalete y externos","Hardware","El brazalete manda la señal por BLE; Twilio respalda los SMS; Google Maps arma el enlace; el 911 recibe la llamada.",["BLE · ESP32","Twilio SMS","Google Maps","911"]]
+  ];
+  const box=$("#layers");
+  L.forEach((l,i)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="layer"; b.setAttribute("aria-pressed", String(i===0));
+    b.innerHTML=`${l[0]}<span>${l[1]}</span>`;
+    b.addEventListener("click", ()=>{ box.querySelectorAll(".layer").forEach((x,j)=>x.setAttribute("aria-pressed", String(j===i))); show(i); });
+    box.appendChild(b);
+  });
+  function show(i){ const l=L[i]; $("#ldT").textContent="Capa "+(i+1)+" de 5"; $("#ldN").textContent=l[0]; $("#ldD").textContent=l[2]; $("#ldTags").innerHTML=l[3].map(t=>`<span>${t}</span>`).join(""); }
+  show(0);
+})();
+
+/* =====================================================================
+   PESTAÑAS DEL PROYECTO
+   ===================================================================== */
+(function(){
+  const tabs=[...document.querySelectorAll(".tab")];
+  function act(t, focus){
+    tabs.forEach(x=>{ const on=x===t; x.setAttribute("aria-selected", String(on)); x.tabIndex = on?0:-1; $("#"+x.getAttribute("aria-controls")).hidden=!on; });
+    if(focus) t.focus();
+    try{ localStorage.setItem("qs-tab", t.id); }catch(e){}
+  }
+  tabs.forEach((t,i)=>{
+    t.addEventListener("click", ()=>act(t));
+    t.addEventListener("keydown", e=>{ if(e.key==="ArrowRight"||e.key==="ArrowLeft"){ const n=tabs[(i+(e.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length]; act(n,true); } });
+  });
+  try{ const s=localStorage.getItem("qs-tab"); const t=s && document.getElementById(s); if(t) act(t); }catch(e){}
+
+  // cronograma
+  const H=[["H-01","12 may","Inicio"],["H-02","27 may","Diseño y prototipos"],["H-03","11 jun","Módulo de contactos"],["H-04","23 jun","Integración BLE"],["H-05","29 jun","Aviso a contactos"],["H-06","08 jul","Llamada al 911"],["H-07","15 jul","Integración total"],["H-08","18 jul","Pruebas QA"],["H-09","21 jul","MVP validado"],["H-10","25 jul","Entrega final"]];
+  $("#timeline").innerHTML = H.map((h,i)=>`<div class="ms${i===9?" last":""}${i===4||i===5?" mid":""}"><i></i><b>${h[0]} · ${h[1]}</b><span>${h[2]}</span></div>`).join("");
+
+  // presupuesto
+  const B=[
+    ["Hardware IoT",3800,"--c1","Microcontroladores, baterías, carcasas, placas PCB y botones para el lote piloto de 5 brazaletes."],
+    ["Nube y APIs",1030,"--c2","Firebase, Twilio para SMS, Google Maps y un servidor de respaldo."],
+    ["Publicar la app",746,"--c3","Licencias de Google Play Console y Apple Developer Program."],
+    ["Operativo",600,"--c4","Transporte a las pruebas de campo en Tecámac y Ecatepec, y papelería."],
+    ["Contingencia",709,"--c5","Reserva que solo se usa con aprobación del sponsor si un riesgo se materializa."]
+  ];
+  const total=B.reduce((a,b)=>a+b[1],0);
+  const fmt=n=>"$"+n.toLocaleString("es-MX")+" MXN";
+  $("#budTotal").textContent=fmt(total);
+  const stack=$("#stack"), legend=$("#legend"), det=$("#budDetail");
+  let cur=-1;
+  function pick(i){
+    cur = cur===i ? -1 : i;
+    stack.classList.toggle("dim", cur>=0);
+    [...stack.children].forEach((b,j)=>b.classList.toggle("on", j===cur));
+    [...legend.children].forEach((b,j)=>{ b.classList.toggle("on", j===cur); b.setAttribute("aria-pressed", String(j===cur)); });
+    det.innerHTML = cur<0 ? "Toca una partida para ver qué incluye." : `<b>${B[cur][0]} · ${(B[cur][1]/total*100).toFixed(1)} %</b> — ${B[cur][3]}`;
+  }
+  B.forEach((b,i)=>{
+    const s=document.createElement("button"); s.type="button"; s.style.flex=b[1]; s.style.background=`var(${b[2]})`; s.setAttribute("aria-label", `${b[0]}: ${fmt(b[1])}`);
+    s.addEventListener("click", ()=>pick(i)); stack.appendChild(s);
+    const l=document.createElement("button"); l.type="button"; l.className="lg"; l.setAttribute("aria-pressed","false");
+    l.innerHTML=`<i style="background:var(${b[2]})"></i><span>${b[0]}</span><b>${fmt(b[1]).replace(" MXN","")}</b>`;
+    l.addEventListener("click", ()=>pick(i)); legend.appendChild(l);
+  });
+
+  // riesgos
+  const R=[
+    ["Sin datos móviles en zonas de Tecámac y Ecatepec",40,"alto","La app cambia sola a SMS con el enlace de ubicación."],
+    ["Retraso en la importación de componentes",25,"alto","Comprar el hardware desde el inicio y cubrir envíos exprés con la reserva."],
+    ["Falla física del brazalete o entrada de agua",20,"medio","Validar la impresión 3D contra salpicaduras antes de armar el lote."],
+    ["Rechazo en Google Play por permisos en segundo plano",15,"medio","Revisar las políticas de Android antes de publicar."]
+  ];
+  $("#risks").innerHTML = R.map(r=>`<div class="risk"><h3>${r[0]}<span class="lvl ${r[2]}">${r[2]==="alto"?"Impacto alto":"Impacto medio"}</span></h3><div class="prob"><span class="mono">${r[1]} % de probabilidad</span><div class="pb"><i style="width:${r[1]}%"></i></div></div><p>${r[3]}</p></div>`).join("");
+})();
+
+})();
+</script>
+
+</body></html>
